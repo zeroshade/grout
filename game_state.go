@@ -1,3 +1,7 @@
+// Copyright (C) 2014 zeroshade. All rights reserved
+// Use of this source code is goverened by the GPLv2 license
+// which can be found in the license.txt file
+
 package grout
 
 import (
@@ -44,6 +48,7 @@ func (gs *gameStateTask) Update() {
 	}
 }
 
+// Interface to define individual game state behavior  
 type GameState interface {
 	Init(*sf.RenderWindow)
 	Update(*sf.RenderWindow) (GameState, bool)

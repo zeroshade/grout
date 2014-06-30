@@ -1,7 +1,12 @@
+// Copyright (C) 2014 zeroshade. All rights reserved
+// Use of this source code is goverened by the GPLv2 license
+// which can be found in the license.txt file
+
 package grout
 
 import (
 	"sort"
+	"time"
 )
 
 type TaskManager interface {
@@ -11,6 +16,7 @@ type TaskManager interface {
 	RemoveTask(t Task)
 	ResumeTask(t Task)
 	KillAllTasks()
+	ElpsTime() time.Duration
 
 	GetSettings() *Config
 }
@@ -53,6 +59,7 @@ type taskMgr struct {
 	taskList       taskList
 	pausedTaskList taskList
 	conf           Config
+	prev           time.Time
 }
 
 func newTaskMgr() *taskMgr {
@@ -143,8 +150,11 @@ func (tm *taskMgr) KillAllTasks() {
 	}
 }
 
+func (tm *taskMgr) ElpsTime() time.Duration { return time.Since(tm.prev) }
+
 func (tm *taskMgr) Execute() {
 	for len(tm.taskList) > 0 {
+		tm.prev = timerUpdate.t
 		for _, t := range tm.taskList {
 			if !t.CanKill() {
 				t.Update()

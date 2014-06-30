@@ -1,3 +1,7 @@
+// Copyright (C) 2014 zeroshade. All rights reserved
+// Use of this source code is goverened by the GPLv2 license
+// which can be found in the license.txt file
+
 package grout
 
 import (
@@ -52,12 +56,13 @@ type fpsTask struct {
 	p bool
 }
 
-func (f *fpsTask) Start() bool { return true }
-func (f *fpsTask) Stop()       {}
+func (f *fpsTask) Start() bool {
+	f.t = time.Now()
+	f.c = 0
+	return true
+}
+func (f *fpsTask) Stop() {}
 func (f *fpsTask) Update() {
-	if f.c == 0 {
-		f.t = time.Now()
-	}
 	f.c++
 
 	if f.p && (f.c%100 == 0) {
