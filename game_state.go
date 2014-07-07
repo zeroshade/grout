@@ -10,11 +10,11 @@ import (
 
 type gameStateTask struct {
 	BasicTask
-	stk gameStateStack
+	stk stack
 }
 
 func (gs *gameStateTask) Start() bool {
-	gs.stk = make(gameStateStack, 1)
+	gs.stk = make(stack, 1)
 	return true
 }
 
@@ -29,45 +29,53 @@ func (gs *gameStateTask) Update() {
 	if len(gs.stk) == 0 {
 		return
 	}
-	state, pop := gs.stk.Top().Update(vidUpdate.win)
+	state, pop := gs.stk.Top().(GameState).Update()
 	if pop {
 		gs.stk.Pop()
 		if state == nil && len(gs.stk) != 0 {
-			gs.stk.Top().OnResume(vidUpdate.win)
+			gs.stk.Top().(GameState).OnResume(GetTaskManager().getWindow())
 		}
 	}
 	if state != nil {
 		if len(gs.stk) != 0 {
-			gs.stk.Top().OnPause()
+			gs.stk.Top().(GameState).OnPause()
 		}
 		gs.stk.Push(state)
-		gs.stk.Top().Init(vidUpdate.win)
+		gs.stk.Top().(GameState).Init(GetTaskManager().getWindow())
 	}
 	if len(gs.stk) == 0 {
 		gs.SetCanKill(true)
 	}
 }
 
-// Interface to define individual game state behavior  
+func (gs *gameStateTask) Draw(w *sf.RenderWindow) {
+	if len(gs.stk) == 0 {
+		return
+	}
+	gs.stk.Top().(GameState).Draw(w)
+}
+
+// Interface to define individual game state behavior
 type GameState interface {
 	Init(*sf.RenderWindow)
-	Update(*sf.RenderWindow) (GameState, bool)
+	Update() (GameState, bool)
+	Draw(*sf.RenderWindow)
 	OnPause()
 	OnResume(*sf.RenderWindow)
 }
 
-type gameStateStack []GameState
+type stack []interface{}
 
-func (s *gameStateStack) Push(gs GameState) {
-	*s = append(*s, gs)
+func (s *stack) Push(i interface{}) {
+	*s = append(*s, i)
 }
 
-func (s *gameStateStack) Pop() GameState {
+func (s *stack) Pop() interface{} {
 	ret := (*s)[len(*s)-1]
 	*s = (*s)[0 : len(*s)-1]
 	return ret
 }
 
-func (s *gameStateStack) Top() GameState {
+func (s *stack) Top() interface{} {
 	return (*s)[len(*s)-1]
 }

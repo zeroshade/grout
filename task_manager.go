@@ -5,6 +5,8 @@
 package grout
 
 import (
+	sf "bitbucket.org/krepa098/gosfml2"
+	"container/list"
 	"sort"
 	"time"
 )
@@ -19,6 +21,8 @@ type TaskManager interface {
 	ElpsTime() time.Duration
 
 	GetSettings() *Config
+	getWindow() *sf.RenderWindow
+	GetEventQueue() *list.List
 }
 
 type taskList []Task
@@ -60,6 +64,10 @@ type taskMgr struct {
 	pausedTaskList taskList
 	conf           Config
 	prev           time.Time
+	win            *sf.RenderWindow
+	w              uint
+	h              uint
+	ticker         *time.Ticker
 }
 
 func newTaskMgr() *taskMgr {
@@ -67,17 +75,23 @@ func newTaskMgr() *taskMgr {
 	if err := loadSettings(&t.conf); err != nil {
 		panic("Failed to load settings")
 	}
+
+	t.w = t.conf.Video.W
+	t.h = t.conf.Video.H
+	t.win = sf.NewRenderWindow(sf.VideoMode{t.w, t.h, 32}, "Testing", sf.StyleDefault, sf.DefaultContextSettings())
+	t.ticker = time.NewTicker(time.Second / t.conf.Video.FPS)
 	return t
 }
 
 var (
 	_This         TaskManager    = newTaskMgr()
-	vidUpdate     *videoTask     = &videoTask{NewBasicTask(1000), nil, nil, _This.GetSettings().Video.W, _This.GetSettings().Video.H}
+	vidUpdate     *SimpleTask    = &SimpleTask{NewBasicTask(1000), nil, func(w *sf.RenderWindow) { w.Display() }}
 	stateUpdate   *gameStateTask = &gameStateTask{BasicTask: NewBasicTask(500)}
 	fpsUpdate     *fpsTask       = &fpsTask{BasicTask: NewBasicTask(1), p: _This.GetSettings().Debug.PrintFPS}
 	timerUpdate   *timerTask     = &timerTask{BasicTask: NewBasicTask(2)}
 	interUpdate   *listTask      = interpolatorUpdater(3)
 	triggerUpdate *listTask      = triggerUpdater(4)
+	inputUpdate   *inputTask     = &inputTask{NewBasicTask(5), nil}
 )
 
 func RegisterTrigger(t Trigger) {
@@ -94,15 +108,24 @@ func init() {
 	_This.AddTask(fpsUpdate)
 	_This.AddTask(timerUpdate)
 	_This.AddTask(interUpdate)
+	_This.AddTask(inputUpdate)
 }
 
 func InitialGameState(g GameState) {
 	stateUpdate.stk[0] = g
-	stateUpdate.stk[0].Init(vidUpdate.win)
+	stateUpdate.stk[0].(GameState).Init(_This.getWindow())
 }
 
 func GetTaskManager() TaskManager {
 	return _This
+}
+
+func (tm *taskMgr) getWindow() *sf.RenderWindow {
+	return tm.win
+}
+
+func (tm *taskMgr) GetEventQueue() *list.List {
+	return inputUpdate.evQue
 }
 
 func (tm *taskMgr) GetSettings() *Config {
@@ -153,18 +176,27 @@ func (tm *taskMgr) KillAllTasks() {
 func (tm *taskMgr) ElpsTime() time.Duration { return time.Since(tm.prev) }
 
 func (tm *taskMgr) Execute() {
+	defer tm.win.Close()
 	for len(tm.taskList) > 0 {
-		tm.prev = timerUpdate.t
-		for _, t := range tm.taskList {
-			if !t.CanKill() {
-				t.Update()
+		select {
+		case <-tm.ticker.C:
+			tm.prev = timerUpdate.t
+			for _, t := range tm.taskList {
+				if !t.CanKill() {
+					t.Update()
+				}
 			}
-		}
-		for i := 0; i < len(tm.taskList); i++ {
-			if tm.taskList[i].CanKill() {
-				tm.taskList[i].Stop()
-				tm.taskList.Remove(i)
-				i--
+			for _, t := range tm.taskList {
+				if !t.CanKill() {
+					t.Draw(tm.win)
+				}
+			}
+			for i := 0; i < len(tm.taskList); i++ {
+				if tm.taskList[i].CanKill() {
+					tm.taskList[i].Stop()
+					tm.taskList.Remove(i)
+					i--
+				}
 			}
 		}
 	}

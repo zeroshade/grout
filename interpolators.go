@@ -17,6 +17,15 @@ func interpolatorUpdater(pri int) *listTask {
 	}}
 }
 
+// Interpolators are designed so that they can update a value based on
+// the elapsed time between calls. If they are frozen they remain but will
+// not be updated, they could also be killed and then removed.
+//
+// IsFrozen() should handle whether or not the Interpolator is frozen
+// Update(dT float64) will be called with dT being the duration since the last
+//                    call to update
+// Kill() being called should result in IsAlive() returning false otherwise IsAlive()
+//        should return true
 type Interpolator interface {
 	IsFrozen() bool
 	Update(dT float64)
@@ -43,8 +52,11 @@ type LinearTimeInterpolator struct {
 	startVal, endVal float64
 }
 
-func NewLinearTimeInterpolator(start, end float64) *LinearTimeInterpolator {
-	return &LinearTimeInterpolator{timeBasedInterpolator{false, 0, 0, true, 0}, start, end}
+// LinearTimeInterpolator
+//
+// It linearly goes from the start value to the end value over timespan milliseconds
+func NewLinearTimeInterpolator(timespan, start, end float64) *LinearTimeInterpolator {
+	return &LinearTimeInterpolator{timeBasedInterpolator{false, 0, timespan, true, 0}, start, end}
 }
 
 func clamp(min, max, val float64) float64 {
@@ -73,8 +85,8 @@ type QuadraticTimeInterpolator struct {
 	startVal, endVal, midVal float64
 }
 
-func NewQuadraticTimeInterpolator(start, end, mid float64) *QuadraticTimeInterpolator {
-	return &QuadraticTimeInterpolator{timeBasedInterpolator{false, 0, 0, true, 0}, start, end, mid}
+func NewQuadraticTimeInterpolator(timespan, start, end, mid float64) *QuadraticTimeInterpolator {
+	return &QuadraticTimeInterpolator{timeBasedInterpolator{false, 0, timespan, true, 0}, start, end, mid}
 }
 
 func (q *QuadraticTimeInterpolator) Update(dT float64) {
@@ -94,8 +106,8 @@ type CubicTimeInterpolator struct {
 	startVal, endVal, midVal1, midVal2 float64
 }
 
-func NewCubicTimeInterpolator(start, end, mid1, mid2 float64) *CubicTimeInterpolator {
-	return &CubicTimeInterpolator{timeBasedInterpolator{false, 0, 0, true, 0}, start, end, mid1, mid2}
+func NewCubicTimeInterpolator(timespan, start, end, mid1, mid2 float64) *CubicTimeInterpolator {
+	return &CubicTimeInterpolator{timeBasedInterpolator{false, 0, timespan, true, 0}, start, end, mid1, mid2}
 }
 
 func (c *CubicTimeInterpolator) Update(dT float64) {

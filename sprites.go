@@ -37,6 +37,7 @@ type DFESprite struct {
 	XOff    float32  `xml:"x,attr"`
 	YOff    float32  `xml:"y,attr"`
 	Z       int      `xml:"z,attr"`
+	FlipH   int      `xml:"flipH,attr"`
 }
 
 type DFESpriteSheet struct {
@@ -52,9 +53,7 @@ type DFEDefs struct {
 	Defs map[string]*DFESpr
 }
 
-func (df *DFEDefs) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	df.Defs = make(map[string]*DFESpr)
-	var dir string
+func (df *DFEDefs) DirParse(dir string, d *xml.Decoder, start xml.StartElement) error {
 	for {
 		token, err := d.Token()
 		if token == nil || err != nil {
@@ -63,11 +62,31 @@ func (df *DFEDefs) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 		switch se := token.(type) {
 		case xml.StartElement:
 			if se.Name.Local == "dir" {
-				dir = se.Attr[0].Value
+				df.DirParse(dir+se.Attr[0].Value+"/", d, start)
 			} else if se.Name.Local == "spr" {
 				spr := new(DFESpr)
 				d.DecodeElement(spr, &se)
 				df.Defs[dir+spr.Name] = spr
+			}
+		case xml.EndElement:
+			if se.Name.Local == "dir" {
+				return nil
+			}
+		}
+	}
+}
+
+func (df *DFEDefs) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	df.Defs = make(map[string]*DFESpr)
+	for {
+		token, err := d.Token()
+		if token == nil || err != nil {
+			return errors.New("WTF")
+		}
+		switch se := token.(type) {
+		case xml.StartElement:
+			if se.Name.Local == "dir" {
+				df.DirParse(se.Attr[0].Value, d, start)
 			}
 		case xml.EndElement:
 			if se.Name.Local == "definitions" {
@@ -126,6 +145,18 @@ type Animation struct {
 	fc        int
 }
 
+func (a *Animation) FlipAnimation() *Animation {
+	anim := &Animation{}
+	anim.cells = make([]AniCell, len(a.cells))
+	for i, c := range a.cells {
+		c.Spr = c.Spr.Copy()
+		r := c.Spr.GetTextureRect()
+		c.Spr.SetTextureRect(sf.IntRect{r.Left + r.Width, r.Top, -r.Width, r.Height})
+		anim.cells[i] = c
+	}
+	return anim
+}
+
 func (s *SpriteObj) LoadAnimations(filename string) error {
 	c := GetTaskManager().GetSettings()
 	sprpath := c.Paths.Res + "/" + c.Paths.Spr + "/"
@@ -176,6 +207,11 @@ func (s *SpriteObj) LoadAnimations(filename string) error {
 			var cell AniCell
 			cell.Spr = animInfo.Sheet.Defs.Defs[c.Spr.ImgName].Spr
 			cell.RenderState = sf.DefaultRenderStates()
+			if c.Spr.FlipH == 1 {
+				cell.Spr = cell.Spr.Copy()
+				r := cell.Spr.GetTextureRect()
+				cell.Spr.SetTextureRect(sf.IntRect{r.Left + r.Width, r.Top, -r.Width, r.Height})
+			}
 			cell.RenderState.Transform.Translate(c.Spr.XOff, c.Spr.YOff)
 			cell.Delay = c.Delay
 			anim.cells = append(anim.cells, cell)
@@ -205,7 +241,7 @@ func (a *Animation) Advance() {
 
 func (a *Animation) Draw(target sf.RenderTarget, renderStates sf.RenderStates) {
 	// t := a.GetTransform()
-	// t.Combine(&a.cells[a.currIndex].RenderState.Transform)	
+	// t.Combine(&a.cells[a.currIndex].RenderState.Transform)
 	renderStates.Transform.Combine(&a.cells[a.currIndex].RenderState.Transform)
 	gb := renderStates.Transform.TransformRect(a.cells[a.currIndex].Spr.GetGlobalBounds())
 

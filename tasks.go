@@ -6,6 +6,7 @@ package grout
 
 import (
 	sf "bitbucket.org/krepa098/gosfml2"
+	"container/list"
 	"log"
 	"time"
 )
@@ -14,6 +15,7 @@ type Task interface {
 	Start() bool
 	OnSuspend()
 	Update()
+	Draw(*sf.RenderWindow)
 	OnResume()
 	Stop()
 
@@ -30,23 +32,34 @@ type BasicTask struct {
 func NewBasicTask(p int) BasicTask {
 	return BasicTask{false, p}
 }
-func (b *BasicTask) CanKill() bool     { return b.canKill }
-func (b *BasicTask) SetCanKill(k bool) { b.canKill = k }
-func (b *BasicTask) GetPriority() int  { return b.priority }
-func (b *BasicTask) OnSuspend()        {}
-func (b *BasicTask) OnResume()         {}
+func (b *BasicTask) CanKill() bool         { return b.canKill }
+func (b *BasicTask) SetCanKill(k bool)     { b.canKill = k }
+func (b *BasicTask) GetPriority() int      { return b.priority }
+func (b *BasicTask) OnSuspend()            {}
+func (b *BasicTask) OnResume()             {}
+func (b *BasicTask) Draw(*sf.RenderWindow) {}
 
 type SimpleTask struct {
 	BasicTask
 	updateFunc func()
+	drawFunc   func(*sf.RenderWindow)
 }
 
 func (d *SimpleTask) Start() bool { return true }
 func (d *SimpleTask) Stop()       {}
-func (d *SimpleTask) Update()     { d.updateFunc() }
+func (d *SimpleTask) Update() {
+	if d.updateFunc != nil {
+		d.updateFunc()
+	}
+}
+func (d *SimpleTask) Draw(w *sf.RenderWindow) {
+	if d.drawFunc != nil {
+		d.drawFunc(w)
+	}
+}
 
-func NewSimpleTask(p int, updateFunc func()) *SimpleTask {
-	return &SimpleTask{NewBasicTask(p), updateFunc}
+func NewSimpleTask(p int, updateFunc func(), drawFunc func(*sf.RenderWindow)) *SimpleTask {
+	return &SimpleTask{NewBasicTask(p), updateFunc, drawFunc}
 }
 
 type fpsTask struct {
@@ -83,45 +96,31 @@ func (t *timerTask) Start() bool {
 	return true
 }
 
-type videoTask struct {
+type inputTask struct {
 	BasicTask
-	win    *sf.RenderWindow
-	ticker *time.Ticker
-	w      uint
-	h      uint
+	evQue *list.List
 }
 
-func (v *videoTask) Start() bool {
-	v.win = sf.NewRenderWindow(sf.VideoMode{v.w, v.h, 32}, "Testing", sf.StyleDefault, sf.DefaultContextSettings())
-	v.ticker = time.NewTicker(time.Second / GetTaskManager().GetSettings().Video.FPS)
-	return v.win != nil && v.ticker != nil
+func (i *inputTask) Start() bool {
+	i.evQue = new(list.List)
+	return i.evQue != nil
 }
 
-func (v *videoTask) Update() {
-	select {
-	case <-v.ticker.C:
-		for event := v.win.PollEvent(); event != nil; event = v.win.PollEvent() {
-			switch ev := event.(type) {
-			case sf.EventKeyReleased:
-				switch ev.Code {
-				case sf.KeyEscape:
-					// v.win.Close()
-					// v.SetCanKill(true)
-				}
-			case sf.EventClosed:
-				v.win.Close()
-				v.SetCanKill(true)
-			}
+func (i *inputTask) Stop() {
+	i.evQue = nil
+}
+
+func (i *inputTask) Update() {
+	win := GetTaskManager().getWindow()
+	i.evQue.Init()
+	for event := win.PollEvent(); event != nil; event = win.PollEvent() {
+		switch event.(type) {
+		case sf.EventClosed:
+			GetTaskManager().KillAllTasks()
+		default:
+			i.evQue.PushBack(event)
 		}
 	}
-	v.win.Display()
-}
-
-func (v *videoTask) Stop() {
-	if v.win.IsOpen() {
-		v.win.Close()
-	}
-	GetTaskManager().KillAllTasks()
 }
 
 type ListItem interface {
