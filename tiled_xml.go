@@ -34,22 +34,34 @@ func LoadMapInfo(file string) (*Map, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	for _, og := range m.Objects {
+		if og.Name != "Collision" {
+			continue
+		}
+		m.Collidables = make([]sf.FloatRect, len(og.Objs))
+		for _, r := range og.Objs {
+			m.Collidables = append(m.Collidables, sf.FloatRect{r.X, r.Y, r.W, r.H})
+		}
+	}
+
 	return m, nil
 }
 
 type Map struct {
-	XMLName    xml.Name    `xml:"map"`
-	Ver        string      `xml:"version,attr"`
-	Ori        string      `xml:"orientation,attr"`
-	Width      uint        `xml:"width,attr"`
-	Height     uint        `xml:"height,attr"`
-	TileWidth  uint        `xml:"tilewidth,attr"`
-	TileHeight uint        `xml:"tileheight,attr"`
-	TSets      []*TileSet  `xml:"tileset"`
-	Layers     []*Layer    `xml:"layer"`
-	Objects    []*ObjGroup `xml:"objectgroup"`
-	TSprites   []*sf.Sprite
-	drawTop    bool
+	XMLName     xml.Name    `xml:"map"`
+	Ver         string      `xml:"version,attr"`
+	Ori         string      `xml:"orientation,attr"`
+	Width       uint        `xml:"width,attr"`
+	Height      uint        `xml:"height,attr"`
+	TileWidth   uint        `xml:"tilewidth,attr"`
+	TileHeight  uint        `xml:"tileheight,attr"`
+	TSets       []*TileSet  `xml:"tileset"`
+	Layers      []*Layer    `xml:"layer"`
+	Objects     []*ObjGroup `xml:"objectgroup"`
+	Collidables []sf.FloatRect
+	TSprites    []*sf.Sprite
+	drawTop     bool
 }
 
 type ObjGroup struct {
@@ -62,10 +74,10 @@ type ObjGroup struct {
 
 type Object struct {
 	XMLName xml.Name `xml:"object"`
-	X       uint     `xml:"x,attr"`
-	Y       uint     `xml:"y,attr"`
-	W       uint     `xml:"width,attr"`
-	H       uint     `xml:"height,attr"`
+	X       float32  `xml:"x,attr"`
+	Y       float32  `xml:"y,attr"`
+	W       float32  `xml:"width,attr"`
+	H       float32  `xml:"height,attr"`
 }
 
 func (m *Map) OnlyTop() {
@@ -134,7 +146,7 @@ func (m *Map) Draw(target sf.RenderTarget, renderStates sf.RenderStates) {
 						s.SetOrigin(sf.Vector2f{X: float32(r.Width), Y: 0})
 						s.SetRotation(270)
 					} else if tile.FlipHoriz {
-						// flip horizontally						
+						// flip horizontally
 						s.SetTextureRect(sf.IntRect{r.Left + r.Width, r.Top, -r.Width, r.Height})
 					} else if tile.FlipVert {
 						// flip vertically
@@ -146,6 +158,18 @@ func (m *Map) Draw(target sf.RenderTarget, renderStates sf.RenderStates) {
 					s.SetOrigin(sf.Vector2f{X: 0, Y: 0})
 				}
 			}
+		}
+	}
+	if GetTaskManager().GetSettings().Debug.ShowSprBound {
+		for _, o := range m.Collidables {
+			rs, _ := sf.NewRectangleShape()
+			rs.SetSize(sf.Vector2f{o.Width, o.Height})
+			rs.SetPosition(sf.Vector2f{o.Left, o.Top})
+			rs.SetOutlineThickness(1)
+			rs.SetOutlineColor(sf.ColorBlack())
+			rs.SetFillColor(sf.ColorTransparent())
+
+			target.Draw(rs, sf.DefaultRenderStates())
 		}
 	}
 }

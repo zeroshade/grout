@@ -12,6 +12,42 @@ import (
 	"os"
 )
 
+const (
+	WALK_RIGHT = iota
+	WALK_LEFT
+	WALK_DOWN
+	WALK_UP
+	STAND_LEFT
+	STAND_RIGHT
+	STAND_UP
+	STAND_DOWN
+)
+
+type SpriteState int
+
+func nameToState(n string) SpriteState {
+	switch n {
+	case "walk-right":
+		return WALK_RIGHT
+	case "walk-left":
+		return WALK_LEFT
+	case "walk-down":
+		return WALK_DOWN
+	case "walk-up":
+		return WALK_UP
+	case "stand-left":
+		return STAND_LEFT
+	case "stand-right":
+		return STAND_RIGHT
+	case "stand-up":
+		return STAND_UP
+	case "stand-down":
+		return STAND_DOWN
+	default:
+		return STAND_RIGHT
+	}
+}
+
 type DFEAnimations struct {
 	XMLName       xml.Name       `xml:"animations"`
 	SheetFileName string         `xml:"spriteSheet,attr"`
@@ -46,6 +82,8 @@ type DFESpriteSheet struct {
 	W       int      `xml:"w,attr"`
 	H       int      `xml:"h,attr"`
 	Defs    DFEDefs  `xml:"definitions"`
+	ZX      int      `xml:"zx,attr"`
+	ZY      int      `xml:"zy,attr"`
 	Texture *sf.Texture
 }
 
@@ -107,37 +145,23 @@ type DFESpr struct {
 }
 
 func NewSpriteObj() *SpriteObj {
-	return &SpriteObj{Transformable: sf.NewTransformable()}
+	return &SpriteObj{}
 }
 
 type SpriteObj struct {
-	*sf.Transformable
 	Animations AnimMap
 	currAnim   *Animation
-	XVel, YVel float32
 }
 
-func (s *SpriteObj) SetAnim(name string) {
-	s.currAnim = s.Animations[name]
-}
-
-func (s *SpriteObj) Update() {
-	if s.XVel != 0 || s.YVel != 0 {
-		delta := float32(GetTaskManager().ElpsTime().Seconds())
-		s.Move(sf.Vector2f{s.XVel * delta, s.YVel * delta})
-		s.currAnim.Advance()
-	} else {
-		s.currAnim.Reset()
-	}
+func (s *SpriteObj) SetAnim(state SpriteState) {
+	s.currAnim = s.Animations[state]
 }
 
 func (s *SpriteObj) Draw(target sf.RenderTarget, renderStates sf.RenderStates) {
-	t := s.GetTransform()
-	renderStates.Transform.Combine(&t)
 	target.Draw(s.currAnim, renderStates)
 }
 
-type AnimMap map[string]*Animation
+type AnimMap map[SpriteState]*Animation
 
 type Animation struct {
 	currIndex int
@@ -192,7 +216,9 @@ func (s *SpriteObj) LoadAnimations(filename string) error {
 		}
 		v.Spr.SetTextureRect(sf.IntRect{v.X, v.Y, v.W, v.H})
 		v.Spr.SetOrigin(sf.Vector2f{float32(v.W / 2), float32(v.H / 2)})
-		// v.Spr.SetScale(sf.Vector2f{2, 2})
+		if animInfo.Sheet.ZX > 0 || animInfo.Sheet.ZY > 0 {
+			v.Spr.SetScale(sf.Vector2f{2, 2})
+		}
 	}
 
 	if s.Animations == nil {
@@ -200,7 +226,8 @@ func (s *SpriteObj) LoadAnimations(filename string) error {
 	}
 	for _, a := range animInfo.Anims {
 		for _, c := range a.Cells {
-			anim := s.Animations[a.Name]
+			state := nameToState(a.Name)
+			anim := s.Animations[state]
 			if anim == nil {
 				anim = &Animation{}
 			}
@@ -215,7 +242,7 @@ func (s *SpriteObj) LoadAnimations(filename string) error {
 			cell.RenderState.Transform.Translate(c.Spr.XOff, c.Spr.YOff)
 			cell.Delay = c.Delay
 			anim.cells = append(anim.cells, cell)
-			s.Animations[a.Name] = anim
+			s.Animations[state] = anim
 		}
 	}
 
@@ -239,9 +266,11 @@ func (a *Animation) Advance() {
 	a.fc++
 }
 
+func (a *Animation) GetBounds() sf.FloatRect {
+	return a.cells[a.currIndex].RenderState.Transform.TransformRect(a.cells[a.currIndex].Spr.GetGlobalBounds())
+}
+
 func (a *Animation) Draw(target sf.RenderTarget, renderStates sf.RenderStates) {
-	// t := a.GetTransform()
-	// t.Combine(&a.cells[a.currIndex].RenderState.Transform)
 	renderStates.Transform.Combine(&a.cells[a.currIndex].RenderState.Transform)
 	gb := renderStates.Transform.TransformRect(a.cells[a.currIndex].Spr.GetGlobalBounds())
 
