@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map SYSTEM "http://mapeditor.org/dtd/1.0/map.dtd">
+<map version="1.0" orientation="orthogonal" width="25" height="8" tilewidth="70" tileheight="70">
+ <tileset firstgid="1" name="sheet" tilewidth="70" tileheight="70">
+  <image source="sheet.png" width="980" height="490"/>
+  <tile id="0">
+   <properties>
+    <property name="moo" value="1"/>
+   </properties>
+  </tile>
+  <tile id="6">
+   <properties>
+    <property name="slope" value="-1"/>
+   </properties>
+  </tile>
+  <tile id="7">
+   <properties>
+    <property name="slope" value="1"/>
+   </properties>
+  </tile>
+ </tileset>
+ <layer name="Tile Layer 1" width="25" height="8">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,8,4,4,4,4,4,20,0,0,6,4,4,1,12,25,26,
+0,0,0,0,0,0,0,0,8,22,17,17,17,17,17,0,0,0,0,17,17,0,0,0,0,
+3,4,4,4,4,4,4,4,22,17,17,17,17,17,17,0,0,0,0,17,17,0,0,0,0
+</data>
+ </layer>
+</map>

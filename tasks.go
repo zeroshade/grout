@@ -111,16 +111,22 @@ func (i *inputTask) Stop() {
 }
 
 func (i *inputTask) Update() {
-	win := GetTaskManager().getWindow()
-	i.evQue.Init()
-	for event := win.PollEvent(); event != nil; event = win.PollEvent() {
-		switch event.(type) {
-		case sf.EventClosed:
-			GetTaskManager().KillAllTasks()
-		default:
-			i.evQue.PushBack(event)
-		}
-	}
+	// win := GetTaskManager().getWindow()
+
+	// i.evQue.Init()
+	// for event := win.PollEvent(); event != nil; event = win.PollEvent() {
+	// 	switch ev := event.(type) {
+	// 	case sf.EventClosed:
+	// 		GetTaskManager().KillAllTasks()
+	// 	case sf.EventResized:
+	// 		v := GetTaskManager().getWindow().GetView()
+	// 		v.Reset(sf.FloatRect{0, 0, float32(ev.Width), float32(ev.Height)})
+	// 		GetTaskManager().getWindow().SetView(v)
+	// 	default:
+	// 		i.evQue.PushBack(event)
+	// 	}
+	// }
+
 }
 
 type ListItem interface {

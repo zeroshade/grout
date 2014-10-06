@@ -7,7 +7,10 @@ package grout
 import (
 	sf "bitbucket.org/krepa098/gosfml2"
 	"container/list"
+	"log"
+	"runtime"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -67,7 +70,9 @@ type taskMgr struct {
 	win            *sf.RenderWindow
 	w              uint
 	h              uint
-	ticker         *time.Ticker
+	evQue          *list.List
+	queMutex       sync.Mutex
+	// ticker         *time.Ticker
 }
 
 func newTaskMgr() *taskMgr {
@@ -78,8 +83,7 @@ func newTaskMgr() *taskMgr {
 
 	t.w = t.conf.Video.W
 	t.h = t.conf.Video.H
-	t.win = sf.NewRenderWindow(sf.VideoMode{t.w, t.h, 32}, "Testing", sf.StyleDefault, sf.DefaultContextSettings())
-	t.ticker = time.NewTicker(time.Second / t.conf.Video.FPS)
+	// t.ticker = time.NewTicker(time.Second / t.conf.Video.FPS)
 	return t
 }
 
@@ -91,7 +95,8 @@ var (
 	timerUpdate   *timerTask     = &timerTask{BasicTask: NewBasicTask(2)}
 	interUpdate   *listTask      = interpolatorUpdater(3)
 	triggerUpdate *listTask      = triggerUpdater(4)
-	inputUpdate   *inputTask     = &inputTask{NewBasicTask(5), nil}
+
+//	inputUpdate   *inputTask     = &inputTask{NewBasicTask(5), nil}
 )
 
 func RegisterTrigger(t Trigger) {
@@ -108,7 +113,7 @@ func init() {
 	_This.AddTask(fpsUpdate)
 	_This.AddTask(timerUpdate)
 	_This.AddTask(interUpdate)
-	_This.AddTask(inputUpdate)
+	//	_This.AddTask(inputUpdate)
 }
 
 func InitialGameState(g GameState) {
@@ -125,7 +130,11 @@ func (tm *taskMgr) getWindow() *sf.RenderWindow {
 }
 
 func (tm *taskMgr) GetEventQueue() *list.List {
-	return inputUpdate.evQue
+	t := tm.evQue
+	tm.queMutex.Lock()
+	tm.evQue = list.New()
+	tm.queMutex.Unlock()
+	return t
 }
 
 func (tm *taskMgr) GetSettings() *Config {
@@ -176,10 +185,15 @@ func (tm *taskMgr) KillAllTasks() {
 func (tm *taskMgr) ElpsTime() time.Duration { return time.Since(tm.prev) }
 
 func (tm *taskMgr) Execute() {
-	defer tm.win.Close()
-	for len(tm.taskList) > 0 {
-		select {
-		case <-tm.ticker.C:
+	done := make(chan bool)
+	tm.evQue = list.New()
+	tm.win = sf.NewRenderWindow(sf.VideoMode{tm.w, tm.h, 32}, "Testing", sf.StyleDefault, sf.DefaultContextSettings())
+	tm.win.SetActive(false)
+	go func(tm *taskMgr) {
+		runtime.LockOSThread()
+		defer tm.win.Close()
+		tm.win.SetFramerateLimit(tm.conf.Video.FPS)
+		for len(tm.taskList) > 0 {
 			tm.prev = timerUpdate.t
 			for _, t := range tm.taskList {
 				if !t.CanKill() {
@@ -198,6 +212,34 @@ func (tm *taskMgr) Execute() {
 					i--
 				}
 			}
+		}
+		log.Println("ENDING")
+		done <- true
+	}(tm)
+
+	for tm.win.IsOpen() {
+		select {
+		default:
+			for event := tm.win.PollEvent(); event != nil; event = tm.win.PollEvent() {
+				switch ev := event.(type) {
+				case sf.EventClosed:
+					tm.KillAllTasks()
+					tm.win.SetVisible(false)
+					tm.win.Close()
+					break
+				case sf.EventResized:
+					v := tm.win.GetView()
+					v.Reset(sf.FloatRect{0, 0, float32(ev.Width), float32(ev.Height)})
+					tm.win.SetView(v)
+				default:
+					tm.queMutex.Lock()
+					tm.evQue.PushBack(event)
+					tm.queMutex.Unlock()
+				}
+			}
+		case <-done:
+			tm.win.SetVisible(false)
+			tm.win.Close()
 		}
 	}
 }

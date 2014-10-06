@@ -6,14 +6,13 @@ package grout
 
 import (
 	"code.google.com/p/gcfg"
-	"time"
 )
 
 type Config struct {
 	Video struct {
-		W   uint          `gcfg:"width"`
-		H   uint          `gcfg:"height"`
-		FPS time.Duration `gcfg:"fps"`
+		W   uint `gcfg:"width"`
+		H   uint `gcfg:"height"`
+		FPS uint `gcfg:"fps"`
 	}
 	Debug struct {
 		PrintFPS     bool `gcfg:"printfps"`

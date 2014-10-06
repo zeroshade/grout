@@ -10,18 +10,21 @@ import (
 
 type GameObject struct {
 	*sf.Transformable
-	XVel, YVel     float32
-	prXVel, prYVel float32
-	XAccel, YAccel float32
-	Spr            *SpriteObj
+	Vel      sf.Vector2f
+	prVel    sf.Vector2f
+	Accel    sf.Vector2f
+	Spr      *SpriteObj
+	AniState SpriteState
 
 	InComp InputComponent
 	MvComp MovementComponent
 	GrComp GraphicsComponent
+
+	onGround bool
 }
 
 func NewGameObj(sp *SpriteObj, ic InputComponent, mv MovementComponent, gr GraphicsComponent) *GameObject {
-	return &GameObject{sf.NewTransformable(), 0, 0, 0, 0, 0, 0, sp, ic, mv, gr}
+	return &GameObject{sf.NewTransformable(), sf.Vector2f{}, sf.Vector2f{}, sf.Vector2f{}, sp, STAND_RIGHT, ic, mv, gr, false}
 }
 
 func (g *GameObject) Draw(target sf.RenderTarget, renderStates sf.RenderStates) {

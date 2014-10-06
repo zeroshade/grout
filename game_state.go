@@ -44,7 +44,7 @@ func (gs *gameStateTask) Update() {
 		gs.stk.Top().(GameState).Init(GetTaskManager().getWindow())
 	}
 	if len(gs.stk) == 0 {
-		GetTaskManager().KillAllTasks()
+		gs.SetCanKill(true)
 	}
 }
 

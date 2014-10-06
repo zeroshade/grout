@@ -10,6 +10,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
+	"log"
 	"math"
 	"os"
 	"strconv"
@@ -62,6 +63,7 @@ type Map struct {
 	Collidables []sf.FloatRect
 	TSprites    []*sf.Sprite
 	drawTop     bool
+	TData       map[uint]map[string]string
 }
 
 type ObjGroup struct {
@@ -116,6 +118,21 @@ func (m *Map) LoadImageData() (err error) {
 				m.TSprites[gid].SetTextureRect(sf.IntRect{srcX, srcY, int(ts.TileWidth), int(ts.TileHeight)})
 			}
 		}
+		if len(ts.TileInfo) > 0 {
+			log.Println("TIle Info")
+			if m.TData == nil {
+				m.TData = make(map[uint]map[string]string)
+			}
+			for _, ti := range ts.TileInfo {
+				if _, ok := m.TData[ti.Gid+1]; !ok {
+					m.TData[ti.Gid+1] = make(map[string]string)
+				}
+				for _, v := range ti.Props {
+					log.Println("Tile:", ti.Gid+1, "Name:", v.Name, "Val:", v.Value)
+					m.TData[ti.Gid+1][v.Name] = v.Value
+				}
+			}
+		}
 	}
 
 	return
@@ -128,8 +145,21 @@ func (m *Map) Draw(target sf.RenderTarget, renderStates sf.RenderStates) {
 		} else if !m.drawTop && layer.Name == "Top" {
 			continue
 		}
-		for y := uint(0); y < layer.Height; y++ {
-			for x := uint(0); x < layer.Width; x++ {
+		v := target.GetView()
+		sz := v.GetSize()
+		ce := v.GetCenter()
+		startX := uint(ce.X-sz.X/2) / m.TileWidth
+		startY := uint(ce.Y-sz.Y/2) / m.TileHeight
+		endX := uint(ce.X+sz.X/2)/m.TileWidth + 1
+		endY := uint(ce.Y+sz.Y/2)/m.TileHeight + 1
+
+		startX = uint(math.Max(math.Min(float64(layer.Width), float64(startX)), 0))
+		startY = uint(math.Max(math.Min(float64(layer.Height), float64(startY)), 0))
+		endX = uint(math.Max(math.Min(float64(layer.Width), float64(endX)), 0))
+		endY = uint(math.Max(math.Min(float64(layer.Height), float64(endY)), 0))
+
+		for y := startY; y < endY; y++ {
+			for x := startX; x < endX; x++ {
 				coord := x + (y * layer.Width)
 				tile := layer.Data.Tiles[coord]
 				if tile.Gid > uint(0) {
@@ -175,14 +205,27 @@ func (m *Map) Draw(target sf.RenderTarget, renderStates sf.RenderStates) {
 }
 
 type TileSet struct {
-	XMLName    xml.Name `xml:"tileset"`
-	FGid       uint     `xml:"firstgid,attr"`
-	Name       string   `xml:"name,attr"`
-	TileWidth  uint     `xml:"tilewidth,attr"`
-	TileHeight uint     `xml:"tileheight,attr"`
-	Image      *ImgInfo `xml:"image"`
+	XMLName    xml.Name   `xml:"tileset"`
+	FGid       uint       `xml:"firstgid,attr"`
+	Name       string     `xml:"name,attr"`
+	TileWidth  uint       `xml:"tilewidth,attr"`
+	TileHeight uint       `xml:"tileheight,attr"`
+	Image      *ImgInfo   `xml:"image"`
+	TileInfo   []TileInfo `xml:"tile"`
 	LGid       uint
 	Texture    *sf.Texture
+}
+
+type TileInfo struct {
+	XMLName xml.Name   `xml:"tile"`
+	Gid     uint       `xml:"id,attr"`
+	Props   []Property `xml:"properties>property"`
+}
+
+type Property struct {
+	XMLName xml.Name `xml:"property"`
+	Name    string   `xml:"name,attr"`
+	Value   string   `xml:"value,attr"`
 }
 
 type ImgInfo struct {
